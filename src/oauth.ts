@@ -1,15 +1,11 @@
 export const SEARCH_CONSOLE_SCOPE = "https://www.googleapis.com/auth/webmasters.readonly";
 export const AUTHORIZATION_URI = "https://accounts.google.com/o/oauth2/v2/auth";
 export const DEFAULT_TOKEN_URI = "https://oauth2.googleapis.com/token";
-export const VAULT_REFRESH_TOKEN_REFERENCE =
-  "google_search_console.default.default.refresh_token";
 export const CALLBACK_PATH = "/oauth/callback";
 export const START_PATH = "/start";
 
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 const DEFAULT_PORT = 0;
-const VAULT_CLIENT = "/home/robot/.local/bin/system-vault";
-
 export interface BootstrapConfig {
   clientId: string;
   clientSecret: string;
@@ -30,17 +26,17 @@ interface PipedStdin {
   end: () => unknown;
 }
 
-export interface VaultSetProcess {
+export interface CredentialProcess {
   stdin: PipedStdin;
   stdout?: ReadableStream<Uint8Array> | null;
   stderr?: ReadableStream<Uint8Array> | null;
   exited: Promise<number>;
 }
 
-export type VaultSpawn = (
+export type CredentialSpawn = (
   args: string[],
   options: { stdin: "pipe"; stdout: "pipe"; stderr: "pipe" },
-) => VaultSetProcess;
+) => CredentialProcess;
 
 export interface PkcePair {
   state: string;
@@ -190,10 +186,7 @@ export function bootstrapConfigFromEnv(
   env: Record<string, string | undefined> = process.env,
 ): BootstrapConfig {
   if (nonEmptyString(env.GOOGLE_SEARCH_CONSOLE_REFRESH_TOKEN)) {
-    throw new Error(
-      "OAuth onboarding requires the bootstrap Vault profile without a refresh token; " +
-        "do not run onboarding through the full reporting profile.",
-    );
+    throw new Error("OAuth onboarding requires client ID and client secret only; omit GOOGLE_SEARCH_CONSOLE_REFRESH_TOKEN.");
   }
 
   const missing = [
@@ -205,7 +198,7 @@ export function bootstrapConfigFromEnv(
   if (missing.length > 0) {
     throw new Error(
       `OAuth bootstrap credentials missing: ${missing.join(", ")}. ` +
-        "Run through `system-vault run google-search-console-bootstrap --`.",
+        "Provide them through the process environment.",
     );
   }
 
@@ -360,35 +353,55 @@ async function drain(stream: ReadableStream<Uint8Array> | null | undefined): Pro
   }
 }
 
-function defaultVaultSpawn(args: string[], options: {
+function defaultCredentialSpawn(args: string[], options: {
   stdin: "pipe";
   stdout: "pipe";
   stderr: "pipe";
-}): VaultSetProcess {
-  return Bun.spawn(args, options) as unknown as VaultSetProcess;
+}): CredentialProcess {
+  return Bun.spawn(args, options) as unknown as CredentialProcess;
 }
 
 /**
- * Store a newly issued refresh token through the Vault client only. The token
- * is written to the child's stdin, while stdout/stderr are drained and never
- * forwarded. The command line contains only a fixed reference and --confirm.
+ * Store a newly issued refresh token through an explicitly configured command
+ * or file path. Commands receive the token on stdin; output is drained and
+ * never forwarded. File storage writes the token followed by a newline.
  */
-export async function setRefreshTokenInVault(
+export async function storeRefreshToken(
   refreshToken: string,
-  spawn: VaultSpawn = defaultVaultSpawn,
+  options: {
+    env?: Record<string, string | undefined>;
+    spawn?: CredentialSpawn;
+    writeFile?: (path: string, content: string) => Promise<number>;
+  } = {},
 ): Promise<void> {
   if (!safeCredential(refreshToken)) throw new Error("Google OAuth returned an invalid refresh token.");
 
-  let child: VaultSetProcess;
+  const env = options.env ?? process.env;
+  const command = env.GOOGLE_SEARCH_CONSOLE_CREDENTIAL_COMMAND?.trim();
+  const path = env.GOOGLE_SEARCH_CONSOLE_REFRESH_TOKEN_FILE?.trim();
+  if (command && path) {
+    throw new Error("Configure only one of GOOGLE_SEARCH_CONSOLE_CREDENTIAL_COMMAND or GOOGLE_SEARCH_CONSOLE_REFRESH_TOKEN_FILE.");
+  }
+  if (path) {
+    try {
+      await (options.writeFile ?? ((filePath, content) => Bun.write(filePath, content)))(path, `${refreshToken}\n`);
+      return;
+    } catch {
+      throw new Error("Credential file could not store the Google Search Console refresh token.");
+    }
+  }
+  if (!command) {
+    throw new Error("OAuth onboarding requires GOOGLE_SEARCH_CONSOLE_CREDENTIAL_COMMAND or GOOGLE_SEARCH_CONSOLE_REFRESH_TOKEN_FILE.");
+  }
+
+  const spawn = options.spawn ?? defaultCredentialSpawn;
+  let child: CredentialProcess;
   try {
-    child = spawn(
-      [VAULT_CLIENT, "set", VAULT_REFRESH_TOKEN_REFERENCE, "--confirm"],
-      { stdin: "pipe", stdout: "pipe", stderr: "pipe" },
-    );
+    child = spawn([command], { stdin: "pipe", stdout: "pipe", stderr: "pipe" });
     await Promise.resolve(child.stdin.write(`${refreshToken}\n`));
     await Promise.resolve(child.stdin.end());
   } catch {
-    throw new Error("System Vault could not receive the Google Search Console refresh token.");
+    throw new Error("Credential command could not receive the Google Search Console refresh token.");
   }
 
   const drains = [drain(child.stdout), drain(child.stderr)];
@@ -397,11 +410,11 @@ export async function setRefreshTokenInVault(
     exitCode = await child.exited;
   } catch {
     await Promise.all(drains);
-    throw new Error("System Vault could not store the Google Search Console refresh token.");
+    throw new Error("Credential command could not store the Google Search Console refresh token.");
   }
   await Promise.all(drains);
   if (exitCode !== 0) {
-    throw new Error("System Vault rejected the Google Search Console refresh token.");
+    throw new Error("Credential command rejected the Google Search Console refresh token.");
   }
 }
 
@@ -544,7 +557,7 @@ export async function runOAuthOnboarding(
         config,
         options.fetchImpl,
       );
-      await (options.setRefreshToken ?? ((token: string) => setRefreshTokenInVault(token)))(refreshToken);
+      await (options.setRefreshToken ?? ((token: string) => storeRefreshToken(token)))(refreshToken);
     } finally {
       clearTimeout(timer);
     }

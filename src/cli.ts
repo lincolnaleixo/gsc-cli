@@ -75,7 +75,7 @@ function hasFlag(flags: Record<string, FlagValue>, name: string): boolean {
 
 export function assertOnboardingConfirmation(flags: Record<string, FlagValue>): void {
   if (!hasFlag(flags, "confirm")) {
-    throw new CliError("onboard requires explicit --confirm because it creates or rotates a Vault secret");
+    throw new CliError("onboard requires explicit --confirm because it creates or rotates a credential");
   }
 }
 
@@ -150,7 +150,7 @@ export function clicksSummary(
 export function usage(): string {
   return `Google Search Console (read-only aggregate reporting)
 
-Usage: /home/robot/.local/bin/system-vault run google-search-console -- bun <skill-directory>/scripts/cli.ts <command> [args]
+Usage: gsc-cli <command> [args]
 
 Commands:
   properties [--json]                    List accessible properties and permissions
@@ -165,11 +165,12 @@ Commands:
     --no-browser                           Show a local helper URL instead of opening a browser
   help                                    Show this help
 
-The OAuth reporting profile must be authorized with webmasters.readonly. For
-onboarding, run this command through the dedicated bootstrap profile, which
-contains only the client ID, client secret, and token URI:
-
-  /home/robot/.local/bin/system-vault run google-search-console-bootstrap -- bun <skill-directory>/scripts/cli.ts onboard --confirm
+The OAuth client must be authorized with webmasters.readonly. Reporting reads
+credentials from GOOGLE_SEARCH_CONSOLE_CLIENT_ID,
+GOOGLE_SEARCH_CONSOLE_CLIENT_SECRET, and GOOGLE_SEARCH_CONSOLE_REFRESH_TOKEN.
+Onboarding reads the client ID and secret from the environment and stores the
+new token using GOOGLE_SEARCH_CONSOLE_CREDENTIAL_COMMAND or
+GOOGLE_SEARCH_CONSOLE_REFRESH_TOKEN_FILE.
 
 Onboarding uses a 127.0.0.1 callback, state, and PKCE. It never prints the
 Google consent URL. If no browser can be opened, it prints only a local
@@ -280,7 +281,7 @@ async function main(): Promise<void> {
           timeoutMs: timeoutSeconds === undefined ? undefined : timeoutSeconds * 1000,
           noBrowser: hasFlag(parsed.flags, "no-browser"),
         });
-        console.log("Google Search Console OAuth grant stored securely in System Vault.");
+        console.log("Google Search Console OAuth grant stored using the configured credential store.");
         return;
       }
       default:

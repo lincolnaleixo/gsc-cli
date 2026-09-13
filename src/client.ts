@@ -64,7 +64,7 @@ function config(): SearchConsoleConfig {
   if (missing.length > 0) {
     throw new Error(
       `Google Search Console credentials missing: ${missing.join(", ")}. ` +
-        "Run through `system-vault run google-search-console --`.",
+        "Provide them through the process environment.",
     );
   }
 
@@ -159,11 +159,11 @@ function apiError(response: Response, payload: unknown): Error {
   if (insufficientScope) {
     return new Error(
       "Google Search Console API rejected the request because the OAuth profile lacks the required " +
-        "webmasters.readonly scope; reauthorize the dedicated Vault profile.",
+        "webmasters.readonly scope; reauthorize the configured OAuth client.",
     );
   }
   if (response.status === 401) {
-    return new Error("Google Search Console API authentication failed; the OAuth profile may be stale.");
+    return new Error("Google Search Console API authentication failed; the OAuth credentials may be stale.");
   }
   if (response.status === 403) {
     return new Error("Google Search Console API access denied for this account or property.");

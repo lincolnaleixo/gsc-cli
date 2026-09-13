@@ -190,10 +190,10 @@ describe("Google Search Console client with mocked OAuth/API", () => {
     await expect(searchConsole.queryClicks(property.siteUrl, 1, "2026-09-03")).rejects.toThrow("malformed");
   });
 
-  test("fails clearly when the Vault profile did not inject credentials", async () => {
+  test("fails clearly when credentials were not provided", async () => {
     previousFetch = globalThis.fetch;
     for (const name of environment) delete process.env[name];
-    await expect(searchConsole.listProperties()).rejects.toThrow("system-vault run google-search-console");
+    await expect(searchConsole.listProperties()).rejects.toThrow("Provide them through the process environment");
   });
 });
 
@@ -234,7 +234,7 @@ describe("Google Search Console CLI contract", () => {
     expect(() => assertAllowedFlags("onboard", { json: true })).toThrow("unknown flag");
     expect(() => assertOnboardingConfirmation({})).toThrow("--confirm");
     expect(() => assertOnboardingConfirmation({ confirm: true })).not.toThrow();
-    expect(usage()).toContain("google-search-console-bootstrap");
+    expect(usage()).toContain("GOOGLE_SEARCH_CONSOLE_CREDENTIAL_COMMAND");
     expect(usage()).toContain("--confirm");
     expect(usage()).toContain("--redirect-uri URI");
     expect(() => assertAllowedFlags("onboard", { "redirect-uri": "http://localhost:8888/callback" })).not.toThrow();
