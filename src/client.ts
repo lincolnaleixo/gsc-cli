@@ -158,7 +158,7 @@ function apiError(response: Response, payload: unknown): Error {
 
   if (insufficientScope) {
     return new Error(
-      "Google Search Console API rejected the request because the OAuth profile lacks the required " +
+      "Google Search Console API rejected the request because the configured OAuth client lacks the required " +
         "webmasters.readonly scope; reauthorize the configured OAuth client.",
     );
   }

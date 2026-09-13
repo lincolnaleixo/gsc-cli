@@ -153,7 +153,7 @@ describe("Google Search Console client with mocked OAuth/API", () => {
         error: {
           code: 403,
           message: "Request had insufficient authentication scopes.",
-          errors: [{ reason: "insufficientPermissions", message: "fixture-private-detail" }],
+          errors: [{ reason: "insufficientPermissions", message: "fixture-provider-detail" }],
         },
       }, 403);
     }) as unknown as typeof fetch;
@@ -162,7 +162,7 @@ describe("Google Search Console client with mocked OAuth/API", () => {
     expect(error).toBeInstanceOf(Error);
     const message = String(error);
     expect(message).toContain("webmasters.readonly");
-    expect(message).not.toContain("fixture-private-detail");
+    expect(message).not.toContain("fixture-provider-detail");
   });
 
   test("surfaces stale OAuth/API errors and never converts them into zero", async () => {

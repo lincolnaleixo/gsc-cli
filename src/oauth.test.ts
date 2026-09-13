@@ -94,7 +94,7 @@ describe("OAuth security primitives", () => {
     })).toThrow("omit GOOGLE_SEARCH_CONSOLE_REFRESH_TOKEN");
     expect(() => bootstrapConfigFromEnv({
       ...env(),
-      GOOGLE_SEARCH_CONSOLE_TOKEN_URI: "https://user:password@example.test/token?secret=value",
+      GOOGLE_SEARCH_CONSOLE_TOKEN_URI: "https://credentials.example.test/token?query=value",
     })).toThrow("without embedded credentials or query data");
   });
 
