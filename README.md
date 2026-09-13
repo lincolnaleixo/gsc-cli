@@ -50,6 +50,17 @@ command arguments:
 - `GOOGLE_SEARCH_CONSOLE_TOKEN_URI` (optional; defaults to Google's HTTPS token
   endpoint)
 
+For onboarding, provide the client ID and secret plus exactly one destination
+for the new refresh token:
+
+- `GOOGLE_SEARCH_CONSOLE_CREDENTIAL_COMMAND` (optional; executable path that
+  receives the token on stdin)
+- `GOOGLE_SEARCH_CONSOLE_REFRESH_TOKEN_FILE` (optional; path written with the
+  token and a trailing newline)
+
+The command and file options are mutually exclusive. No credential destination
+is selected by default.
+
 The OAuth client must be authorized with the
 `https://www.googleapis.com/auth/webmasters.readonly` scope. To onboard a new
 refresh token, provide only the client ID, client secret, and optional token URI

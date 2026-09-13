@@ -4,7 +4,6 @@ import {
   CALLBACK_PATH,
   SEARCH_CONSOLE_SCOPE,
   START_PATH,
-  VAULT_REFRESH_TOKEN_REFERENCE,
   buildConsentUrl,
   bootstrapConfigFromEnv,
   callbackPathFromRedirectUri,
@@ -12,16 +11,16 @@ import {
   exchangeAuthorizationCode,
   pkceChallenge,
   runOAuthOnboarding,
-  setRefreshTokenInVault,
+  storeRefreshToken,
   type BootstrapConfig,
   type HttpHandler,
   type LoopbackServer,
-  type VaultSetProcess,
+  type CredentialProcess,
   validateRedirectUri,
 } from "./oauth.ts";
 
 const TOKEN_URI = "https://oauth2.example.test/token";
-const CLIENT_ID = "fixture-client-id.apps.googleusercontent.com";
+const CLIENT_ID = "fixture-client-id";
 const CLIENT_SECRET = "fixture-client-secret-value";
 const REFRESH_TOKEN = "fixture-refresh-token-value";
 const AUTH_CODE = "fixture-authorization-code";
@@ -88,11 +87,11 @@ afterEach(() => {
 });
 
 describe("OAuth security primitives", () => {
-  test("requires the dedicated bootstrap profile and rejects an injected refresh token", () => {
+  test("requires onboarding credentials without an injected refresh token", () => {
     expect(() => bootstrapConfigFromEnv({
       ...env(),
       GOOGLE_SEARCH_CONSOLE_REFRESH_TOKEN: REFRESH_TOKEN,
-    })).toThrow("bootstrap Vault profile without a refresh token");
+    })).toThrow("omit GOOGLE_SEARCH_CONSOLE_REFRESH_TOKEN");
     expect(() => bootstrapConfigFromEnv({
       ...env(),
       GOOGLE_SEARCH_CONSOLE_TOKEN_URI: "https://user:password@example.test/token?secret=value",
@@ -457,8 +456,8 @@ describe("loopback OAuth onboarding", () => {
   });
 });
 
-describe("Vault refresh-token handoff", () => {
-  test("uses only fixed argv, writes the token to stdin, drains child output, and emits no logs", async () => {
+describe("Configured refresh-token handoff", () => {
+  test("uses the configured command, writes the token to stdin, drains child output, and emits no logs", async () => {
     let args: string[] = [];
     let input = "";
     let options: unknown;
@@ -472,10 +471,12 @@ describe("Vault refresh-token handoff", () => {
       output += values.join(" ");
     };
     try {
-      await setRefreshTokenInVault(REFRESH_TOKEN, (nextArgs, nextOptions) => {
+      await storeRefreshToken(REFRESH_TOKEN, {
+        env: { GOOGLE_SEARCH_CONSOLE_CREDENTIAL_COMMAND: "credential-helper" },
+        spawn: (nextArgs, nextOptions) => {
         args = nextArgs;
         options = nextOptions;
-        const child: VaultSetProcess = {
+        const child: CredentialProcess = {
           stdin: {
             write(value) {
               input += typeof value === "string" ? value : new TextDecoder().decode(value);
@@ -487,16 +488,14 @@ describe("Vault refresh-token handoff", () => {
           exited: Promise.resolve(0),
         };
         return child;
+        },
       });
     } finally {
       console.log = originalLog;
       console.error = originalError;
     }
     expect(args).toEqual([
-      "/home/robot/.local/bin/system-vault",
-      "set",
-      VAULT_REFRESH_TOKEN_REFERENCE,
-      "--confirm",
+      "credential-helper",
     ]);
     expect(JSON.stringify(options)).toContain('"stdin":"pipe"');
     expect(input).toBe(`${REFRESH_TOKEN}\n`);
@@ -504,22 +503,40 @@ describe("Vault refresh-token handoff", () => {
     expect(output).toBe("");
   });
 
-  test("does not reflect token values if the Vault process fails", async () => {
+  test("does not reflect token values if the credential command fails", async () => {
     let output = "";
     const originalError = console.error;
     console.error = (...values: unknown[]) => {
       output += values.join(" ");
     };
     try {
-      const error = await setRefreshTokenInVault(REFRESH_TOKEN, () => {
+      const error = await storeRefreshToken(REFRESH_TOKEN, {
+        env: { GOOGLE_SEARCH_CONSOLE_CREDENTIAL_COMMAND: "credential-helper" },
+        spawn: () => {
         throw new Error(`${REFRESH_TOKEN} ${CLIENT_SECRET}`);
+        },
       }).catch((value: unknown) => value);
-      expect(String(error)).toContain("System Vault");
+      expect(String(error)).toContain("Credential command");
       expect(String(error)).not.toContain(REFRESH_TOKEN);
       expect(String(error)).not.toContain(CLIENT_SECRET);
     } finally {
       console.error = originalError;
     }
     expect(output).toBe("");
+  });
+
+  test("supports an explicitly configured credential file", async () => {
+    let writtenPath = "";
+    let writtenContent = "";
+    await storeRefreshToken(REFRESH_TOKEN, {
+      env: { GOOGLE_SEARCH_CONSOLE_REFRESH_TOKEN_FILE: "./fixture-token" },
+      writeFile: async (path, content) => {
+        writtenPath = path;
+        writtenContent = content;
+        return content.length;
+      },
+    });
+    expect(writtenPath).toBe("./fixture-token");
+    expect(writtenContent).toBe(`${REFRESH_TOKEN}\n`);
   });
 });
