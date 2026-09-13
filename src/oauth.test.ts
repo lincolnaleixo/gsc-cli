@@ -474,29 +474,27 @@ describe("Configured refresh-token handoff", () => {
       await storeRefreshToken(REFRESH_TOKEN, {
         env: { GOOGLE_SEARCH_CONSOLE_CREDENTIAL_COMMAND: "credential-helper" },
         spawn: (nextArgs, nextOptions) => {
-        args = nextArgs;
-        options = nextOptions;
-        const child: CredentialProcess = {
-          stdin: {
-            write(value) {
-              input += typeof value === "string" ? value : new TextDecoder().decode(value);
+          args = nextArgs;
+          options = nextOptions;
+          const child: CredentialProcess = {
+            stdin: {
+              write(value) {
+                input += typeof value === "string" ? value : new TextDecoder().decode(value);
+              },
+              end: () => undefined,
             },
-            end: () => undefined,
-          },
-          stdout: byteStream(REFRESH_TOKEN),
-          stderr: byteStream(REFRESH_TOKEN),
-          exited: Promise.resolve(0),
-        };
-        return child;
+            stdout: byteStream(REFRESH_TOKEN),
+            stderr: byteStream(REFRESH_TOKEN),
+            exited: Promise.resolve(0),
+          };
+          return child;
         },
       });
     } finally {
       console.log = originalLog;
       console.error = originalError;
     }
-    expect(args).toEqual([
-      "credential-helper",
-    ]);
+    expect(args).toEqual(["credential-helper"]);
     expect(JSON.stringify(options)).toContain('"stdin":"pipe"');
     expect(input).toBe(`${REFRESH_TOKEN}\n`);
     expect(args.join(" ")).not.toContain(REFRESH_TOKEN);
@@ -513,7 +511,7 @@ describe("Configured refresh-token handoff", () => {
       const error = await storeRefreshToken(REFRESH_TOKEN, {
         env: { GOOGLE_SEARCH_CONSOLE_CREDENTIAL_COMMAND: "credential-helper" },
         spawn: () => {
-        throw new Error(`${REFRESH_TOKEN} ${CLIENT_SECRET}`);
+          throw new Error(`${REFRESH_TOKEN} ${CLIENT_SECRET}`);
         },
       }).catch((value: unknown) => value);
       expect(String(error)).toContain("Credential command");
