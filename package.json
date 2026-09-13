@@ -1,0 +1,13 @@
+{
+  "name": "gsc-cli",
+  "version": "1.0.0",
+  "description": "Google Search Console reporting CLI and API client.",
+  "type": "module",
+  "packageManager": "bun@1.4.0",
+  "bin": { "gsc-cli": "./bin/gsc-cli" },
+  "scripts": {
+    "check": "bun run typecheck && bun run test"
+  },
+  "devDependencies": { "@types/bun": "1.4.0", "typescript": "7.0.2" }
+}
+
