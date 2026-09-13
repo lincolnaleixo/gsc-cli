@@ -1,37 +1,79 @@
 # gsc-cli
 
-Google Search Console reporting CLI and API client
+Read-only Google Search Console reporting CLI and OAuth onboarding tool.
 
 ## Install
 
-## Use
-
-## License
-
-MIT.
-# gsc-cli
-
-A TypeScript CLI and client for Google Search Console reporting and OAuth onboarding.
-
-## Install
-
-Requires Bun. Clone this repository, run `bun install`, then run `bun run check`.
-
-## Use
-
-The executable is `./bin/gsc-cli`. The default invocation is:
+Requires [Bun](https://bun.sh/). From a checkout of this repository:
 
 ```bash
-system-vault run google-search-console -- ./bin/gsc-cli help
+bun install
 ```
 
-Commands: Run `./bin/gsc-cli help` for property listing, query reporting, and OAuth options. Reporting uses explicit properties, date windows, dimensions, and row limits.
+The executable is `./bin/gsc-cli`. It runs TypeScript directly with Bun; no
+build step is required.
 
-## Environment
+## Commands
 
-Credentials are read only from environment variables. Inject them with your organization's secret broker; never commit a `.env` file or put secret values in arguments.
+All commands accept `help` to display the built-in usage text.
 
-`GOOGLE_SEARCH_CONSOLE_CLIENT_ID`, `GOOGLE_SEARCH_CONSOLE_CLIENT_SECRET`, `GOOGLE_SEARCH_CONSOLE_REFRESH_TOKEN`, optional `GOOGLE_SEARCH_CONSOLE_TOKEN_URI`.
+```text
+./bin/gsc-cli properties [--json]
+./bin/gsc-cli verify <property> [--json]
+./bin/gsc-cli clicks <property> --days N [--end-date YYYY-MM-DD] [--json]
+./bin/gsc-cli onboard --confirm [options]
+./bin/gsc-cli help
+```
+
+- `properties` lists accessible properties and their permission levels.
+- `verify` confirms one exact, accessible property string.
+- `clicks` reports aggregate web clicks for 1–365 inclusive days. It does not
+  request query, page, or dimension data. `--end-date` defaults to today.
+- `onboard` performs offline OAuth consent using a loopback callback and stores
+  the resulting refresh token through the configured credential store. It
+  requires `--confirm`.
+- `help` prints command details and OAuth callback guidance.
+
+The `--json` option emits machine-readable output for reporting commands.
+OAuth also supports `--port`, `--redirect-uri`, `--timeout-seconds`, and
+`--no-browser`; see `./bin/gsc-cli help` for their constraints.
+
+## Environment and OAuth onboarding
+
+For reporting, provide these environment variables through your secret manager
+or process supervisor. Do not commit a `.env` file or put secret values in
+command arguments:
+
+- `GOOGLE_SEARCH_CONSOLE_CLIENT_ID`
+- `GOOGLE_SEARCH_CONSOLE_CLIENT_SECRET`
+- `GOOGLE_SEARCH_CONSOLE_REFRESH_TOKEN`
+- `GOOGLE_SEARCH_CONSOLE_TOKEN_URI` (optional; defaults to Google's HTTPS token
+  endpoint)
+
+The OAuth client must be authorized with the
+`https://www.googleapis.com/auth/webmasters.readonly` scope. To onboard a new
+refresh token, provide only the client ID, client secret, and optional token URI
+to the onboarding process, then run:
+
+```bash
+./bin/gsc-cli onboard --confirm
+```
+
+Onboarding uses state and PKCE, binds a local loopback callback, and never
+prints the provider consent URL. If a browser cannot be opened, use the local
+helper URL it prints. Desktop OAuth clients support this flow. For a web OAuth
+client, register the exact loopback callback URI and pass it with
+`--redirect-uri`; use `--port` when a fixed local port is required.
+
+## Check
+
+Run the type check and test suite with:
+
+```bash
+bun run check
+```
+
+Individual commands are available as `bun run typecheck` and `bun run test`.
 
 ## License
 
