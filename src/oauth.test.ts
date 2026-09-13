@@ -136,7 +136,7 @@ describe("OAuth security primitives", () => {
       "http://localhost:8888",
       "https://localhost:8888/callback",
       "http://example.test:8888/callback",
-      "http://user:password@localhost:8888/callback",
+      "http://fixture-user:fixture-password@localhost:8888/callback",
       "http://localhost:8888/callback?state=unexpected",
       "http://localhost:8888/callback#fragment",
       "http://localhost:8888/start",
